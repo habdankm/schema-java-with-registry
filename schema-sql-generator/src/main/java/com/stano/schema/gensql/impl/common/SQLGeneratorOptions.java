@@ -26,6 +26,7 @@ public class SQLGeneratorOptions {
   private final int targetPostgresVersion;
   private final boolean emitPostgresExtensions;
   private final String extensionCheckUser;
+  private final int targetSqlServerVersion;
 
   /**
    * Creates a new options instance using the database type's default statement separator and the
@@ -192,6 +193,53 @@ public class SQLGeneratorOptions {
       boolean emitPostgresExtensions,
       String extensionCheckUser) {
 
+    this(
+        schema,
+        sqlWriter,
+        databaseType,
+        foreignKeyMode,
+        booleanMode,
+        outputMode,
+        statementSeparator,
+        targetPostgresVersion,
+        emitPostgresExtensions,
+        extensionCheckUser,
+        0);
+  }
+
+  /**
+   * Creates a new options instance with all settings specified explicitly, including the target SQL
+   * Server product year.
+   *
+   * @param schema the schema to generate SQL from
+   * @param sqlWriter the writer to which the generated SQL is written
+   * @param databaseType the target database dialect
+   * @param foreignKeyMode how foreign keys should be expressed in the generated SQL
+   * @param booleanMode how boolean columns should be expressed in the generated SQL
+   * @param outputMode which parts of the schema should be output
+   * @param statementSeparator the separator to write after each generated SQL statement
+   * @param targetPostgresVersion the target PostgreSQL major version (e.g. 17, 18), or {@code 0} to
+   *     use the default
+   * @param emitPostgresExtensions whether to emit the PostgreSQL {@code create extension} block
+   *     (citext, btree_gist); ignored for non-PostgreSQL dialects
+   * @param extensionCheckUser the Postgres role whose superuser privilege is checked in the create
+   *     extension block, or {@code null} to check {@code CURRENT_USER}
+   * @param targetSqlServerVersion the target SQL Server product year (e.g. 2022, 2025), or {@code
+   *     0} to use the default; ignored for non-SQL Server dialects
+   */
+  public SQLGeneratorOptions(
+      Schema schema,
+      PrintWriter sqlWriter,
+      DatabaseType databaseType,
+      ForeignKeyMode foreignKeyMode,
+      BooleanMode booleanMode,
+      OutputMode outputMode,
+      String statementSeparator,
+      int targetPostgresVersion,
+      boolean emitPostgresExtensions,
+      String extensionCheckUser,
+      int targetSqlServerVersion) {
+
     this.schema = schema;
     this.sqlWriter = sqlWriter;
     this.databaseType = databaseType;
@@ -202,6 +250,7 @@ public class SQLGeneratorOptions {
     this.targetPostgresVersion = targetPostgresVersion;
     this.emitPostgresExtensions = emitPostgresExtensions;
     this.extensionCheckUser = extensionCheckUser;
+    this.targetSqlServerVersion = targetSqlServerVersion;
   }
 
   /**
@@ -309,5 +358,16 @@ public class SQLGeneratorOptions {
   public String getExtensionCheckUser() {
 
     return extensionCheckUser;
+  }
+
+  /**
+   * Returns the target SQL Server product year.
+   *
+   * @return the target SQL Server product year (e.g. 2022, 2025), or {@code 0} if none was
+   *     specified
+   */
+  public int getTargetSqlServerVersion() {
+
+    return targetSqlServerVersion;
   }
 }

@@ -30,8 +30,8 @@ public abstract class ColumnTypeMapper {
     if (columnType == ColumnType.DECIMAL) return getDecimalSql(column);
     if (columnType == ColumnType.BOOLEAN) return getBooleanSql();
     if (columnType == ColumnType.DATE) return getDateSql();
-    if (columnType == ColumnType.DATETIME || columnType == ColumnType.TIMESTAMP)
-      return getDateTimeSql();
+    if (columnType == ColumnType.DATETIME) return getDateTimeSql();
+    if (columnType == ColumnType.TIMESTAMP) return getTimestampSql();
     if (columnType == ColumnType.TIME) return getTimeSql();
     if (columnType == ColumnType.TIMESTAMPTZ) return getTimestampTZSql();
     if (columnType == ColumnType.CHAR) return getCharSql(column);
@@ -106,6 +106,15 @@ public abstract class ColumnTypeMapper {
 
   protected String getDateTimeSql() {
     return "timestamp";
+  }
+
+  /**
+   * Used only for {@link ColumnType#TIMESTAMP} (as distinct from {@link ColumnType#DATETIME}, which
+   * always uses {@link #getDateTimeSql()}) - defaults to the same SQL as {@code DateTime} since
+   * most dialects don't distinguish the two, but SQL Server overrides it to {@code datetime2}.
+   */
+  protected String getTimestampSql() {
+    return getDateTimeSql();
   }
 
   protected String getTimeSql() {

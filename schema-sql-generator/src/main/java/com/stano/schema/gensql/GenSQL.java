@@ -244,6 +244,53 @@ public class GenSQL {
       int targetPostgresVersion,
       boolean emitPostgresExtensions,
       String extensionCheckUser) {
+    generateSQL(
+        databaseType,
+        schema,
+        writer,
+        foreignKeyMode,
+        booleanMode,
+        outputMode,
+        statementSeparator,
+        targetPostgresVersion,
+        emitPostgresExtensions,
+        extensionCheckUser,
+        0);
+  }
+
+  /**
+   * Generates SQL DDL for the given schema and writes it to the supplied writer, with the target
+   * SQL Server product year specified explicitly.
+   *
+   * @param databaseType the database dialect to generate SQL for
+   * @param schema the parsed schema to generate SQL from
+   * @param writer the writer to which the generated SQL is written; it is closed once generation
+   *     completes (successfully or not)
+   * @param foreignKeyMode how foreign keys should be expressed in the generated SQL
+   * @param booleanMode how boolean columns should be expressed in the generated SQL
+   * @param outputMode which parts of the schema should be output
+   * @param statementSeparator the separator written after each generated SQL statement
+   * @param targetPostgresVersion the target PostgreSQL major version (e.g. 17, 18), or {@code 0} to
+   *     use the default
+   * @param emitPostgresExtensions whether to emit the PostgreSQL {@code create extension} block
+   *     (citext, btree_gist); ignored for non-PostgreSQL dialects
+   * @param extensionCheckUser the Postgres role whose superuser privilege is checked in the create
+   *     extension block, or {@code null} to check {@code CURRENT_USER}
+   * @param targetSqlServerVersion the target SQL Server product year (e.g. 2022, 2025), or {@code
+   *     0} to use the default; ignored for non-SQL Server dialects
+   */
+  public void generateSQL(
+      DatabaseType databaseType,
+      Schema schema,
+      PrintWriter writer,
+      ForeignKeyMode foreignKeyMode,
+      BooleanMode booleanMode,
+      OutputMode outputMode,
+      String statementSeparator,
+      int targetPostgresVersion,
+      boolean emitPostgresExtensions,
+      String extensionCheckUser,
+      int targetSqlServerVersion) {
     try {
       SQLGenerator sqlGenerator =
           sqlGeneratorFactory.createSQLGenerator(
@@ -257,7 +304,8 @@ public class GenSQL {
                   statementSeparator,
                   targetPostgresVersion,
                   emitPostgresExtensions,
-                  extensionCheckUser));
+                  extensionCheckUser,
+                  targetSqlServerVersion));
 
       sqlGenerator.generate();
     } finally {
@@ -317,7 +365,7 @@ public class GenSQL {
             "USAGE: GenSQL <target-database> <schema-filename> [--foreign-key-mode=mode]"
                 + " [--boolean-mode=mode] [--output-indexes-only] [--output-triggers-only]"
                 + " [--postgresql-version=N] [--no-postgres-extensions]"
-                + " [--extension-check-user=name] [--output-file=path]");
+                + " [--extension-check-user=name] [--sqlserver-version=N] [--output-file=path]");
         System.out.println(
             "   where <target-database> is one or more of: [H2,POSTGRESQL,SQL_SERVER] separated by"
                 + " commas");
@@ -338,6 +386,9 @@ public class GenSQL {
             "   and   <extension-check-user> is the Postgres role whose superuser privilege is"
                 + " checked in the create extension block (default is CURRENT_USER)");
         System.out.println(
+            "   and   <sqlserver-version> is the target SQL Server product year (e.g., 2022,"
+                + " 2025); affects the json column type");
+        System.out.println(
             "   and   <output-file> overrides the default output path; only valid when exactly"
                 + " one target database is requested");
         System.exit(1);
@@ -354,6 +405,7 @@ public class GenSQL {
       boolean emitPostgresExtensions = true;
       String extensionCheckUser = null;
       String outputFile = null;
+      int targetSqlServerVersion = 0;
 
       for (String arg : args) {
         if (arg.startsWith("--foreign-key-mode=")) {
@@ -374,6 +426,8 @@ public class GenSQL {
           extensionCheckUser = arg.substring("--extension-check-user=".length());
         } else if (arg.startsWith("--output-file=")) {
           outputFile = arg.substring("--output-file=".length());
+        } else if (arg.startsWith("--sqlserver-version=")) {
+          targetSqlServerVersion = Integer.parseInt(arg.substring("--sqlserver-version=".length()));
         }
       }
 
@@ -421,7 +475,8 @@ public class GenSQL {
             databaseType.getStatementSeparator(),
             targetPostgresVersion,
             emitPostgresExtensions,
-            extensionCheckUser);
+            extensionCheckUser,
+            targetSqlServerVersion);
       }
     } catch (Throwable x) {
       x.printStackTrace();

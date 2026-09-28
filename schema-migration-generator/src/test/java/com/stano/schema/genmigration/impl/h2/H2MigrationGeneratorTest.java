@@ -327,7 +327,7 @@ class H2MigrationGeneratorTest {
   @DisplayName("guards DROP CONSTRAINT with IF EXISTS")
   void generatesDropConstraintIsGuarded() {
     ChangeSet changeSet = new ChangeSet();
-    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total"));
+    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total", null));
 
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);

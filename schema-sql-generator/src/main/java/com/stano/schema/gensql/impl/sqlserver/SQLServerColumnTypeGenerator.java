@@ -13,7 +13,8 @@ class SQLServerColumnTypeGenerator extends ColumnTypeGenerator {
 
   @Override
   protected ColumnTypeMapper createMapper(BooleanMode booleanMode, Schema schema) {
-    return new SQLServerColumnTypeMapper(booleanMode, schema);
+    return new SQLServerColumnTypeMapper(
+        booleanMode, schema, sqlGenerator.getSqlGeneratorOptions().getTargetSqlServerVersion());
   }
 
   @Override

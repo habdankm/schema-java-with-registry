@@ -8,8 +8,25 @@ import com.stano.schema.model.EnumValue;
 import com.stano.schema.model.Schema;
 
 public class SQLServerColumnTypeMapper extends ColumnTypeMapper {
+  private final int targetSqlServerVersion;
+
   public SQLServerColumnTypeMapper(BooleanMode booleanMode, Schema schema) {
+    this(booleanMode, schema, 0);
+  }
+
+  /**
+   * Creates a mapper that gates version-specific column types (currently just the native {@code
+   * json} type, introduced in SQL Server 2025) on a target SQL Server product year.
+   *
+   * @param booleanMode how boolean columns should be expressed in the generated SQL
+   * @param schema the schema being generated, used to resolve enum value lengths, or {@code null}
+   * @param targetSqlServerVersion the target SQL Server product year (e.g. 2022, 2025), or {@code
+   *     0} to target the widest range of servers
+   */
+  public SQLServerColumnTypeMapper(
+      BooleanMode booleanMode, Schema schema, int targetSqlServerVersion) {
     super(booleanMode, schema);
+    this.targetSqlServerVersion = targetSqlServerVersion;
   }
 
   @Override
@@ -29,7 +46,7 @@ public class SQLServerColumnTypeMapper extends ColumnTypeMapper {
 
   @Override
   protected String getDateSql() {
-    return "datetime";
+    return "date";
   }
 
   @Override
@@ -38,8 +55,13 @@ public class SQLServerColumnTypeMapper extends ColumnTypeMapper {
   }
 
   @Override
+  protected String getTimestampSql() {
+    return "datetime2";
+  }
+
+  @Override
   protected String getTimeSql() {
-    return "datetime";
+    return "time";
   }
 
   @Override
@@ -111,5 +133,16 @@ public class SQLServerColumnTypeMapper extends ColumnTypeMapper {
   @Override
   protected String getArraySql(Column column) {
     throw new UnsupportedOperationException("SQL Server does not support arrays");
+  }
+
+  @Override
+  protected String getJsonSql() {
+    // SQL Server's native json type doesn't exist before SQL Server 2025; use it only when
+    // explicitly targeting 2025+, otherwise fall back to nvarchar(max), which works on every
+    // supported version.
+    if (targetSqlServerVersion >= 2025) {
+      return "json";
+    }
+    return super.getJsonSql();
   }
 }

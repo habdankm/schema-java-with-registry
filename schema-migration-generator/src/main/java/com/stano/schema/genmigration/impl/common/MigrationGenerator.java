@@ -109,9 +109,13 @@ public abstract class MigrationGenerator {
     } else if (change instanceof DropKeyChange c) {
       generateDropKey(c);
     } else if (change instanceof AddConstraintChange c) {
-      generateAddConstraint(c);
+      if (appliesToThisDialect(c.getConstraint().getDatabaseType())) {
+        generateAddConstraint(c);
+      }
     } else if (change instanceof DropConstraintChange c) {
-      generateDropConstraint(c);
+      if (appliesToThisDialect(c.getDatabaseType())) {
+        generateDropConstraint(c);
+      }
     } else if (change instanceof AddRelationChange c) {
       generateAddRelation(c);
     } else if (change instanceof DropRelationChange c) {
@@ -125,10 +129,24 @@ public abstract class MigrationGenerator {
     } else if (change instanceof DropProcedureChange c) {
       generateDropProcedure(c);
     } else if (change instanceof AddViewChange c) {
-      generateAddView(c);
+      if (appliesToThisDialect(c.getView().getDatabaseType())) {
+        generateAddView(c);
+      }
     } else if (change instanceof DropViewChange c) {
-      generateDropView(c);
+      if (appliesToThisDialect(c.getDatabaseType())) {
+        generateDropView(c);
+      }
     }
+  }
+
+  /**
+   * Returns whether an object restricted to {@code objectDatabaseType} applies to the dialect this
+   * generator produces SQL for - {@code true} if {@code objectDatabaseType} is {@code null} (the
+   * object applies to every dialect) or matches {@link
+   * MigrationGeneratorOptions#getDatabaseType()}.
+   */
+  private boolean appliesToThisDialect(com.stano.schema.model.DatabaseType objectDatabaseType) {
+    return objectDatabaseType == null || objectDatabaseType == options.getDatabaseType();
   }
 
   /**

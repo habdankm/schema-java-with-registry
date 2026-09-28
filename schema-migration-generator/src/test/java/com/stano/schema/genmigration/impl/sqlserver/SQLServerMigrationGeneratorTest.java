@@ -436,7 +436,7 @@ class SQLServerMigrationGeneratorTest {
   @DisplayName("guards DROP CONSTRAINT with a sys.objects existence check")
   void generatesDropConstraintIsGuarded() {
     ChangeSet changeSet = new ChangeSet();
-    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total"));
+    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total", null));
 
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);

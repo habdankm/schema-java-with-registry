@@ -221,6 +221,35 @@ class SchemaDiffEngineTest {
   }
 
   @Test
+  @DisplayName("a brand-new table's relation to a pre-existing table is still added")
+  void addedTableWithRelationToExistingTableEmitsAddRelation() {
+    Schema oldSchema = new Schema(TEST_URL);
+    Schema newSchema = new Schema(TEST_URL);
+
+    Table oldUsersTable = new Table(oldSchema, null, "users", null, null, false);
+    oldSchema.addTable(oldUsersTable);
+
+    Table newUsersTable = new Table(newSchema, null, "users", null, null, false);
+    newSchema.addTable(newUsersTable);
+    // "orders" is brand-new in newSchema - addRelations() must not skip it just because it has
+    // no counterpart in oldSchema.
+    Table newOrdersTable = new Table(newSchema, null, "orders", null, null, false);
+    Relation fk = new Relation("orders", "user_id", "users", "id", RelationType.CASCADE, false);
+    newOrdersTable.getRelations().add(fk);
+    newSchema.addTable(newOrdersTable);
+
+    SchemaDiffEngine engine = new SchemaDiffEngine();
+    ChangeSet changeSet = engine.diff(oldSchema, newSchema);
+
+    assertTrue(
+        changeSet.getChanges().stream()
+            .anyMatch(
+                c ->
+                    c instanceof com.stano.schema.diff.change.AddRelationChange add
+                        && add.getRelation().getFromTableName().equals("orders")));
+  }
+
+  @Test
   @DisplayName("detects added view")
   void detectsAddedView() {
     Schema oldSchema = new Schema(TEST_URL);
@@ -316,6 +345,50 @@ class SchemaDiffEngineTest {
     assertEquals(2, changeSet.getChanges().size());
     assertTrue(changeSet.getChanges().get(0) instanceof DropConstraintChange);
     assertTrue(changeSet.getChanges().get(1) instanceof AddConstraintChange);
+  }
+
+  @Test
+  @DisplayName("dropped constraint carries its own database type")
+  void dropConstraintCarriesItsOwnDatabaseType() {
+    Schema oldSchema = new Schema(TEST_URL);
+    Table oldTable = new Table(oldSchema, null, "orders", null, null, false);
+    oldTable.getConstraints().add(new Constraint("chk_qty", "qty > 0", DatabaseType.SQL_SERVER));
+    oldSchema.addTable(oldTable);
+
+    Schema newSchema = new Schema(TEST_URL);
+    Table newTable = new Table(newSchema, null, "orders", null, null, false);
+    newSchema.addTable(newTable);
+
+    SchemaDiffEngine engine = new SchemaDiffEngine();
+    ChangeSet changeSet = engine.diff(oldSchema, newSchema);
+
+    assertTrue(
+        changeSet.getChanges().stream()
+            .anyMatch(
+                c ->
+                    c instanceof DropConstraintChange drop
+                        && drop.getConstraintName().equals("chk_qty")
+                        && drop.getDatabaseType() == DatabaseType.SQL_SERVER));
+  }
+
+  @Test
+  @DisplayName("dropped view carries its own database type")
+  void dropViewCarriesItsOwnDatabaseType() {
+    Schema oldSchema = new Schema(TEST_URL);
+    oldSchema.addView(new View(null, "v_orders", "select id from orders", DatabaseType.SQL_SERVER));
+
+    Schema newSchema = new Schema(TEST_URL);
+
+    SchemaDiffEngine engine = new SchemaDiffEngine();
+    ChangeSet changeSet = engine.diff(oldSchema, newSchema);
+
+    assertTrue(
+        changeSet.getChanges().stream()
+            .anyMatch(
+                c ->
+                    c instanceof DropViewChange drop
+                        && drop.getViewName().equals("v_orders")
+                        && drop.getDatabaseType() == DatabaseType.SQL_SERVER));
   }
 
   @Test

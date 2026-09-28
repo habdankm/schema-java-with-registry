@@ -106,10 +106,10 @@ public class SchemaDiffEngine {
     for (View oldView : oldSchema.getViews()) {
       View newView = newViewsByName.get(oldView.getName());
       if (newView == null) {
-        changeSet.addChange(new DropViewChange(oldView.getName()));
-      } else if (!java.util.Objects.equals(oldView.getSql(), newView.getSql())) {
-        // View SQL changed: drop the old one so addViews() re-creates it with the new SQL.
-        changeSet.addChange(new DropViewChange(oldView.getName()));
+        changeSet.addChange(new DropViewChange(oldView.getName(), oldView.getDatabaseType()));
+      } else if (!viewsEqual(oldView, newView)) {
+        // View SQL (or database type) changed: drop the old one so addViews() re-creates it.
+        changeSet.addChange(new DropViewChange(oldView.getName(), oldView.getDatabaseType()));
       }
     }
   }
@@ -181,7 +181,8 @@ public class SchemaDiffEngine {
       for (Constraint oldConstraint : oldTable.getConstraints()) {
         if (!containsConstraint(newTable.getConstraints(), oldConstraint)) {
           changeSet.addChange(
-              new DropConstraintChange(oldTable.getName(), oldConstraint.getName()));
+              new DropConstraintChange(
+                  oldTable.getName(), oldConstraint.getName(), oldConstraint.getDatabaseType()));
         }
       }
     }
@@ -339,16 +340,19 @@ public class SchemaDiffEngine {
     Map<String, Table> oldTablesByName = indexTablesByName(oldSchema);
     for (Table newTable : newSchema.getTables()) {
       Table oldTable = oldTablesByName.get(newTable.getName());
-      if (oldTable == null) {
-        continue;
-      }
+
+      // A brand-new table (no oldTable) still needs its relations emitted - addTables() only
+      // creates an empty stub table, and the column/key changes that follow build it up via
+      // separate ALTER TABLE statements that don't touch relations - so compare against an
+      // empty list rather than skipping the table entirely.
+      List<Relation> oldRelations = oldTable == null ? List.of() : oldTable.getRelations();
 
       // See dropRelations - same ordinal so an added relation gets the name the create path
       // would give it.
       List<Relation> newRelations = newTable.getRelations();
       for (int i = 0; i < newRelations.size(); i++) {
         Relation newRelation = newRelations.get(i);
-        if (!containsRelation(oldTable.getRelations(), newRelation)) {
+        if (!containsRelation(oldRelations, newRelation)) {
           changeSet.addChange(new AddRelationChange(newRelation, i + 1));
         }
       }
@@ -361,7 +365,7 @@ public class SchemaDiffEngine {
       View oldView = oldViewsByName.get(newView.getName());
       if (oldView == null) {
         changeSet.addChange(new AddViewChange(newView));
-      } else if (!java.util.Objects.equals(oldView.getSql(), newView.getSql())) {
+      } else if (!viewsEqual(oldView, newView)) {
         // dropViews already emitted a DropViewChange; emit the AddViewChange with new SQL.
         changeSet.addChange(new AddViewChange(newView));
       }
@@ -467,11 +471,17 @@ public class SchemaDiffEngine {
   private boolean containsConstraint(List<Constraint> constraints, Constraint target) {
     for (Constraint constraint : constraints) {
       if (constraint.getName().equals(target.getName())
+          && java.util.Objects.equals(constraint.getDatabaseType(), target.getDatabaseType())
           && java.util.Objects.equals(constraint.getSql(), target.getSql())) {
         return true;
       }
     }
     return false;
+  }
+
+  private boolean viewsEqual(View a, View b) {
+    return java.util.Objects.equals(a.getSql(), b.getSql())
+        && java.util.Objects.equals(a.getDatabaseType(), b.getDatabaseType());
   }
 
   private boolean containsRelation(List<Relation> relations, Relation target) {

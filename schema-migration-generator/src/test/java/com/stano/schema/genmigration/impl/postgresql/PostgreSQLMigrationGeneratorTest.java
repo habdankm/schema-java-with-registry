@@ -545,7 +545,7 @@ class PostgreSQLMigrationGeneratorTest {
   @DisplayName("generates DROP CONSTRAINT IF EXISTS for drop-constraint change")
   void generatesDropConstraintUsesIfExists() {
     ChangeSet changeSet = new ChangeSet();
-    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total"));
+    changeSet.addChange(new DropConstraintChange("orders", "ck_orders_total", null));
 
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);
@@ -556,6 +556,32 @@ class PostgreSQLMigrationGeneratorTest {
 
     String sql = sw.toString();
     assertTrue(sql.contains("DROP CONSTRAINT IF EXISTS ck_orders_total"), "got: " + sql);
+  }
+
+  @Test
+  @DisplayName("skips a constraint/view targeting a different dialect")
+  void skipsChangesTargetingADifferentDialect() {
+    ChangeSet changeSet = new ChangeSet();
+    changeSet.addChange(
+        new AddConstraintChange(
+            "orders", new Constraint("ck_orders_total", "total >= 0", DatabaseType.SQL_SERVER)));
+    changeSet.addChange(new DropConstraintChange("orders", "ck_old", DatabaseType.SQL_SERVER));
+    changeSet.addChange(
+        new com.stano.schema.diff.change.AddViewChange(
+            new com.stano.schema.model.View(
+                null, "v_orders", "select id from orders", DatabaseType.SQL_SERVER)));
+    changeSet.addChange(
+        new com.stano.schema.diff.change.DropViewChange("v_old_orders", DatabaseType.SQL_SERVER));
+
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+    MigrationGeneratorOptions opts =
+        new MigrationGeneratorOptions(changeSet, pw, DatabaseType.POSTGRESQL);
+    PostgreSQLMigrationGenerator gen = new PostgreSQLMigrationGenerator(opts);
+    gen.generate();
+
+    String sql = sw.toString();
+    assertTrue(sql.isBlank(), "expected no SQL Server-targeted SQL, got: " + sql);
   }
 
   @Test

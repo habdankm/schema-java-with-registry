@@ -41,10 +41,10 @@ class SQLServerColumnTypeGeneratorTest {
     "LONG,        bigint",
     "FLOAT,       real",
     "DOUBLE,      double precision",
-    "DATE,        datetime",
+    "DATE,        date",
     "DATETIME,    datetime",
-    "TIMESTAMP,   datetime",
-    "TIME,        datetime",
+    "TIMESTAMP,   datetime2",
+    "TIME,        time",
     "TIMESTAMPTZ, datetimeoffset",
     "UUID,        uniqueidentifier",
     "BINARY,      varbinary(max)",
@@ -169,7 +169,35 @@ class SQLServerColumnTypeGeneratorTest {
     assertThrows(UnsupportedOperationException.class, () -> generator.getColumnTypeSql(null, col));
   }
 
+  @Test
+  @DisplayName("JSON defaults to nvarchar(max) when no target SQL Server version is set")
+  void jsonDefaultsToNvarcharMax() {
+    Column col = new Column("col", ColumnType.JSON, 0, false);
+    assertEquals("nvarchar(max)", generator.getColumnTypeSql(null, col));
+  }
+
+  @ParameterizedTest(name = "targeting SQL Server {0} -> {1}")
+  @DisplayName("JSON uses native json only when targeting SQL Server 2025 or later")
+  @CsvSource({
+    "0,    nvarchar(max)",
+    "2022, nvarchar(max)",
+    "2025, json",
+    "2026, json",
+  })
+  void jsonUsesNativeJsonOnlyWhenTargetingSqlServer2025OrLater(
+      int targetSqlServerVersion, String expectedSql) {
+    SQLServerColumnTypeGenerator versionedGenerator =
+        createGenerator(BooleanMode.NATIVE, null, targetSqlServerVersion);
+    Column col = new Column("col", ColumnType.JSON, 0, false);
+    assertEquals(expectedSql, versionedGenerator.getColumnTypeSql(null, col));
+  }
+
   private SQLServerColumnTypeGenerator createGenerator(BooleanMode booleanMode, Schema schema) {
+    return createGenerator(booleanMode, schema, 0);
+  }
+
+  private SQLServerColumnTypeGenerator createGenerator(
+      BooleanMode booleanMode, Schema schema, int targetSqlServerVersion) {
     SQLGenerator sqlGen =
         new SQLGenerator(
             new SQLGeneratorOptions(
@@ -178,7 +206,12 @@ class SQLServerColumnTypeGeneratorTest {
                 DatabaseType.SQL_SERVER,
                 ForeignKeyMode.RELATIONS,
                 booleanMode,
-                OutputMode.ALL)) {
+                OutputMode.ALL,
+                DatabaseType.SQL_SERVER.getStatementSeparator(),
+                0,
+                true,
+                null,
+                targetSqlServerVersion)) {
           @Override
           protected void outputTables() {}
 
