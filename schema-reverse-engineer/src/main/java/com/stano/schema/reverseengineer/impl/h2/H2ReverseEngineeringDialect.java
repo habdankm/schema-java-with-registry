@@ -34,6 +34,11 @@ public class H2ReverseEngineeringDialect implements ReverseEngineeringDialect {
   }
 
   @Override
+  public String defaultSchema() {
+    return "PUBLIC";
+  }
+
+  @Override
   public void populateConstraints(Schema schema, Connection connection, String schemaName)
       throws SQLException {
     String sql =

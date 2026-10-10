@@ -67,9 +67,17 @@ public class SchemaReverseEngineer {
               .hasArg()
               .desc("database schema to introspect (default: public)")
               .get());
+      options.addOption(
+          Option.builder()
+              .longOpt("with-engine-aware-schema-name")
+              .desc(
+                  "keep a schema own name in the written document, including the one an engine"
+                      + " calls its default")
+              .get());
 
       var parser = new DefaultParser();
       var cmd = parser.parse(options, args);
+      boolean withEngineAwareSchemaName = cmd.hasOption("with-engine-aware-schema-name");
 
       try (var connection =
           DriverManager.getConnection(
@@ -78,11 +86,20 @@ public class SchemaReverseEngineer {
               cmd.getOptionValue("password"))) {
         var schemaFile = new File(cmd.getOptionValue("file"));
         var schemaReader = new SchemaReader();
-        var dbSchema = cmd.getOptionValue("db-schema", SchemaReader.DEFAULT_SCHEMA);
-        var schema = schemaReader.readSchema(connection, dbSchema);
+        // No --db-schema means the READER decides, from the connection: its own default is
+        // engine-specific, and a
+        // Postgres name pushed in here made the CLI introspect nothing on H2.
+        var dbSchema = cmd.getOptionValue("db-schema");
+        // A NULL passed on would mean "every schema visible", which is not what an absent option
+        // says: absent means the
+        // reader own default, taken from the connection.
+        var schema =
+            dbSchema == null || dbSchema.isBlank()
+                ? schemaReader.readSchema(connection, withEngineAwareSchemaName)
+                : schemaReader.readSchema(connection, dbSchema);
 
         try (var writer = new PrintWriter(new FileWriter(schemaFile))) {
-          var schemaWriter = new SchemaWriter(writer);
+          var schemaWriter = new SchemaWriter(writer, withEngineAwareSchemaName);
           schemaWriter.outputSchema(schema);
         }
       }
