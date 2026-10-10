@@ -11,8 +11,7 @@ import java.sql.Statement;
 /**
  * PostgreSQL constraints, and this is the library's own logic moved rather than rewritten: the same
  * catalog query, the same contype letters, the same rules about which of them become a Constraint.
- * It was the only piece of the reader that spoke PostgreSQL, and it is the reason the reader could
- * not run against H2 at all.
+ * It was the only piece of the reader that spoke PostgreSQL.
  *
  * <p>What the letters mean, and why only two of them are used: PostgreSQL reports p (primary key),
  * u (unique), x (exclusion) and c (check). Primary keys and uniques are read from the JDBC
@@ -23,6 +22,11 @@ public class PostgreSQLReverseEngineeringDialect implements ReverseEngineeringDi
   @Override
   public String productName() {
     return "PostgreSQL";
+  }
+
+  @Override
+  public String defaultSchema() {
+    return "public";
   }
 
   @Override

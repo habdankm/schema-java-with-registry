@@ -26,7 +26,11 @@ import org.slf4j.LoggerFactory;
 public class SchemaReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(SchemaReader.class);
 
-  /** The Postgres schema introspected when no schema name is given explicitly. */
+  /**
+   * The FALLBACK schema, used only when the CONNECTION reports none of its own. It is not "the"
+   * default: H2 keeps PUBLIC and PostgreSQL keeps public, so the default is asked of the connection
+   * and this constant answers only a driver that says nothing.
+   */
   public static final String DEFAULT_SCHEMA = "public";
 
   /**
@@ -36,6 +40,27 @@ public class SchemaReader {
    */
   public Schema readSchema(Connection connection) {
     return readSchema(connection, DEFAULT_SCHEMA);
+  }
+
+  /**
+   * Reads the given database's metadata into a {@link Schema}, choosing which schema to introspect
+   * by the flag rather than by a name assumed for every engine.
+   *
+   * <p>Off, the default is {@link #DEFAULT_SCHEMA}, exactly as above. On, the schema is what the
+   * ENGINE says its default is - PUBLIC on H2, public on PostgreSQL, dbo on SQL Server - which is a
+   * fact about that database and not a constant: assuming one name for every engine made this
+   * introspect nothing at all on the other one.
+   */
+  public Schema readSchema(Connection connection, boolean withEngineAwareSchemaName) {
+    if (!withEngineAwareSchemaName) {
+      return readSchema(connection, DEFAULT_SCHEMA);
+    }
+
+    try {
+      return readSchema(connection, new DialectFactory().resolve(connection).defaultSchema());
+    } catch (SQLException x) {
+      throw new RuntimeException(x);
+    }
   }
 
   /**

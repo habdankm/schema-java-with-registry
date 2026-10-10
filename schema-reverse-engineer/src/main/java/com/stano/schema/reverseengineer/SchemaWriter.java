@@ -24,14 +24,29 @@ import org.apache.commons.text.StringEscapeUtils;
  */
 public class SchemaWriter {
   private final PrintWriter out;
+  private final boolean withEngineAwareSchemaName;
 
   /**
-   * Creates a writer that serializes schemas to the given output.
+   * Creates a writer that serializes schemas to the given output, with the behaviour this library
+   * has always had: a table whose schema is "public" (or carries no name) is written flat under
+   * <database>.
    *
    * @param out the writer that the generated XML is printed to
    */
   public SchemaWriter(PrintWriter out) {
+    this(out, false);
+  }
+
+  /**
+   * Creates a writer that keeps a schema own name in the document when asked, instead of assuming
+   * "public" is every engine default. On, the H2 definition says PUBLIC instead of losing it.
+   *
+   * @param out the writer that the generated XML is printed to
+   * @param withEngineAwareSchemaName whether a schema own name is kept in the document
+   */
+  public SchemaWriter(PrintWriter out, boolean withEngineAwareSchemaName) {
     this.out = out;
+    this.withEngineAwareSchemaName = withEngineAwareSchemaName;
   }
 
   /**
@@ -50,15 +65,19 @@ public class SchemaWriter {
           version="1.0">\
 """);
 
-    // Tables in the default schema ("public", or with no schema name recorded) are written flat
-    // under <database>, as before; tables in any other named schema are grouped and wrapped in a
-    // <schema name="..."> element, so the schema name round-trips through the parser instead of
-    // being silently discarded.
+    // Off, tables whose schema is "public" (or carries no name) are written flat, which is what
+    // this library
+    // has always done. On, every NAMED schema is wrapped in <schema name="..."> - including the
+    // name an
+    // engine happens to call its default - so the name round-trips instead of being silently
+    // discarded.
     Map<String, List<Table>> tablesBySchema = new LinkedHashMap<>();
     for (Table table : schema.getTables()) {
       String schemaName = table.getSchemaName();
       String key =
-          (schemaName == null || schemaName.isBlank() || schemaName.equalsIgnoreCase("public"))
+          (schemaName == null
+                  || schemaName.isBlank()
+                  || (!withEngineAwareSchemaName && schemaName.equalsIgnoreCase("public")))
               ? ""
               : schemaName;
       tablesBySchema.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(table);

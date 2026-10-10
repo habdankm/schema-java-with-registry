@@ -36,9 +36,8 @@ public class KeyContentHandler extends AbstractContentHandler {
       keyType = KeyType.valueOf(localName.toUpperCase());
       cluster = Boolean.parseBoolean(atts.getValue("cluster"));
       compress = Boolean.parseBoolean(atts.getValue("compress"));
-      unique = Boolean.parseBoolean(atts.getValue("unique"));
-      include = atts.getValue("include");
-      filter = atts.getValue("where");
+      include = blankToNull(atts.getValue("include"));
+      filter = blankToNull(atts.getValue("where"));
       columns.clear();
     } else if (localName.equals("column")) {
       columns.add(new KeyColumn(atts.getValue("name")));
@@ -73,5 +72,16 @@ public class KeyContentHandler extends AbstractContentHandler {
               .getIndexes()
               .add(new Key(keyType, columns, false, compress, unique, include, filter));
     }
+  }
+
+  /**
+   * An attribute the schema gives a default of "" and an attribute that is absent are the SAME
+   * THING here, and the validator makes the first look like a value: it injects the XSD defaults
+   * into the Attributes set, so where and include arrive as "" instead of null. Treating "" as "a
+   * predicate exists" threw away perfectly valid keys and hid two of the parser own tests until the
+   * schema started validating.
+   */
+  private static String blankToNull(String value) {
+    return value == null || value.isEmpty() ? null : value;
   }
 }

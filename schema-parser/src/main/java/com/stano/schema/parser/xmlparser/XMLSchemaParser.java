@@ -6,6 +6,8 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.DefaultHandler;
@@ -21,6 +23,8 @@ import org.xml.sax.helpers.DefaultHandler;
  * SchemaContentHandler}.
  */
 public class XMLSchemaParser {
+  private static final Logger LOGGER = LoggerFactory.getLogger(XMLSchemaParser.class);
+
   /**
    * Parses the XML content from the given reader, dispatching SAX events to the given handler.
    *
@@ -43,9 +47,29 @@ public class XMLSchemaParser {
 
   private XMLReader createXMLReader() {
     try {
-      // Load XSD schema from classpath
+      // The XSD is not part of this repository: com.stano:schema-xsd bundles it as a JAR resource,
+      // and schema-model
+      // depends on that artifact with `api`, so on the JVM every consumer of this library already
+      // has it.
+      //
+      // An IMAGE is the case worth knowing about: GraalVM keeps only what it is told to keep, so
+      // the resource has to
+      // be named in the native-image arguments (-H:IncludeResources) or it is simply absent at run
+      // time. Absent means
+      // getResource returns null and SchemaFactory.newSchema(null) validates nothing, so an entire
+      // run parses
+      // unvalidated in silence. That is why the missing case says so, once, instead of passing
+      // unnoticed.
+      var schemaResource = getClass().getResource("/schema.xsd");
+      if (schemaResource == null) {
+        LOGGER.warn(
+            "No /schema.xsd on the classpath, so documents are parsed WITHOUT validation. It comes"
+                + " from the com.stano:schema-xsd artifact; in a native image it must also be"
+                + " included explicitly through -H:IncludeResources.");
+      }
+
       SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-      Schema schema = schemaFactory.newSchema(getClass().getResource("/schema.xsd"));
+      Schema schema = schemaFactory.newSchema(schemaResource);
 
       // Allocate and configure JAXP SAX parser factory
       SAXParserFactory factory = SAXParserFactory.newInstance();
